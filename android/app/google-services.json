@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "24131452118",
+    "project_id": "stocknote-7b4d5",
+    "storage_bucket": "stocknote-7b4d5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:24131452118:android:30706f7f7e06775516dd77",
+        "android_client_info": {
+          "package_name": "com.stocknote"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "24131452118-bqjlqqhgoqrqk1pg04mfb97lj6k7hoob.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDISsyVNAKUqMnIba550-03PrUit2Mu4Wg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "24131452118-bqjlqqhgoqrqk1pg04mfb97lj6k7hoob.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "24131452118-lmtp8jun0gib0hg6r953329o49eidt2i.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.aiChart"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:24131452118:android:1f8614f1c54568e516dd77",
+        "android_client_info": {
+          "package_name": "com.stocknote.ai_chart"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "24131452118-p63dt5445mmaoquf4e8o2b1u9ikqoob9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.stocknote.ai_chart",
+            "certificate_hash": "364870fd0f03d7d08ae3044a0a3be511b3f56ee5"
+          }
+        },
+        {
+          "client_id": "24131452118-bqjlqqhgoqrqk1pg04mfb97lj6k7hoob.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDISsyVNAKUqMnIba550-03PrUit2Mu4Wg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "24131452118-bqjlqqhgoqrqk1pg04mfb97lj6k7hoob.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "24131452118-lmtp8jun0gib0hg6r953329o49eidt2i.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.aiChart"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
