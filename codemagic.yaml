@@ -3,11 +3,17 @@ workflows:
     name: iOS Release Build
     max_build_duration: 60
 
+    integrations:
+      app_store_connect: Codemagic test
+
     environment:
       flutter: stable
 
     scripts:
       - flutter pub get
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles --project ios/Runner.xcodeproj
       - flutter build ipa --release
 
     artifacts:
