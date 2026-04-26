@@ -41,7 +41,7 @@ class RankingPage extends StatefulWidget {
 
 class _RankingPageState extends State<RankingPage> {
   TradeMode _mode = TradeMode.log;
-  static const String _serverBaseUrl = "http://46.224.127.151:8000";
+  static const String _serverBaseUrl = "https://api.stockarena.co.kr";
 
 
   String? _selectedSymbol;

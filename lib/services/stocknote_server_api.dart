@@ -7,7 +7,7 @@ import '../src/model/candle.dart';
 /// 서버와 통신하는 공용 API 모음
 class StocknoteServerApi {
   /// FastAPI 서버 기본 주소
-  static const String baseUrl = 'http://46.224.127.151:8000';
+  static const String baseUrl = 'https://api.stockarena.co.kr';
 
   /// 🔎 검색 API 호출
   static Future<List<Map<String, dynamic>>> search({

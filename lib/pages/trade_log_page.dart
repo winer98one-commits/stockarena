@@ -84,7 +84,7 @@ class _TradeLogPageState extends State<TradeLogPage> {
   late TradeMode _mode;   // 🔹 late 로 변경
 
   // ✅ 서버 관련 설정 & 상태 (종목 요약)
-  static const String _serverBaseUrl = "http://46.224.127.151:8000";
+  static const String _serverBaseUrl = "https://api.stockarena.co.kr";
   Map<String, dynamic>? _serverSymbolSummary;   // 서버에서 받은 종목 요약
   bool _serverSummaryLoading = false;           // 로딩 중 표시
   String? _serverSummaryError;                 // 에러 메시지 저장

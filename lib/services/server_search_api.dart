@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 /// [{symbol, name, exchange, ...}, ...] 형태로 돌려주는 헬퍼
 class ServerSearchApi {
   // ⭐ 서버 주소
-  static const String baseUrl = 'http://46.224.127.151:8000';
+  static const String baseUrl = 'https://api.stockarena.co.kr';
 
   /// EODHD 기반 서버 검색
   /// - 반환 형식: List<Map<String, dynamic>>

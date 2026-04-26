@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 
 class GameServerApi {
-  static const String _baseUrl = "http://46.224.127.151:8000";
+  static const String _baseUrl = "https://api.stockarena.co.kr";
 
 
   // --------------------------------------------------

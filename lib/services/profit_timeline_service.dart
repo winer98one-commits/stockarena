@@ -36,7 +36,7 @@ class ProfitPoint {
 
 class ProfitTimelineService {
   // ✅ 서버 주소 (GameServerApi와 동일)
-  static const String _baseUrl = "http://46.224.127.151:8000";
+  static const String _baseUrl = "https://api.stockarena.co.kr";
 
   /// 🔥 수익률 타임라인 (서버에서 가져오기)
   ///

@@ -291,7 +291,7 @@ class _DiscussionPageState extends State<DiscussionPage> {
     );
   }
 
-  static const String _serverBaseUrl = "http://46.224.127.151:8000";
+  static const String _serverBaseUrl = "https://api.stockarena.co.kr";
 
   Future<Map<String, int>> _fetchRankMap(String symbolUpper) async {
     final uri = Uri.parse('$_serverBaseUrl/game/ranking').replace(
