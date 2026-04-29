@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:in_app_review/in_app_review.dart';
-// ⭐ 추가
+import 'package:in_app_review/in_app_review.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'dart:math';
+import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/game_server_api.dart';
 
@@ -309,6 +311,73 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final oauthCredential = OAuthProvider("apple.com").credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
+
+      final userCred =
+      await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+
+      final user = userCred.user;
+
+      if (!mounted) return;
+
+      setState(() {
+        _user = user;
+        _loading = false;
+      });
+
+      if (user != null) {
+        final appleName = [
+          appleCredential.givenName,
+          appleCredential.familyName,
+        ]
+            .where((e) => e != null && e.trim().isNotEmpty)
+            .map((e) => e!)
+            .join(" ");
+
+        final nickname = appleName.isNotEmpty
+            ? appleName
+            : user.displayName ?? _defaultNicknameFromEmail(user.email);
+
+        _nicknameController.text = nickname;
+
+        await _ensureGameAccount(
+          user.uid,
+          nickname,
+          user.email,
+        );
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Apple 로그인 성공")),
+      );
+
+      Navigator.pop(context, true);
+    } catch (e) {
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+
   // ------------------- 닉네임 저장 -------------------
 
   Future<void> _saveNickname() async {
@@ -501,7 +570,27 @@ class _LoginPageState extends State<LoginPage> {
                     Text(_loading ? "로그인 중..." : "Google 계정으로 로그인"),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+
+                // ⭐ Apple 로그인 버튼 - iOS에서만 표시
+                if (Platform.isIOS)
+                  SizedBox(
+                    width: 260,
+                    child: ElevatedButton.icon(
+                      onPressed: _loading ? null : _signInWithApple,
+                      icon: const Icon(Icons.apple),
+                      label: const Text("Apple로 로그인"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+
+                if (Platform.isIOS)
+                  const SizedBox(height: 16)
+                else
+                  const SizedBox(height: 16),
 
                 if (kDebugMode) ...[
                   // ✅ 테스트 닉네임 입력
