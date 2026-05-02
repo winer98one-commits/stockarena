@@ -51,6 +51,9 @@ class _DiscussionPageState extends State<DiscussionPage> {
 // ✅ 관리자 표시용
   bool _isAdmin = false;
 
+// ✅ 관리자 UID 목록 표시용
+  bool _adminUsersLoading = false;
+  List<Map<String, dynamic>> _adminUsers = [];
   String get _symbolKey =>
       (_selectedSymbol ?? widget.symbolRaw).trim().toUpperCase();
 
@@ -575,6 +578,129 @@ class _DiscussionPageState extends State<DiscussionPage> {
     );
   }
 
+  Future<void> _loadAdminUsers() async {
+    setState(() {
+      _adminUsersLoading = true;
+    });
+
+    try {
+      final result = await GameServerApi.fetchAdminUsers();
+
+      final items = result['items'];
+      if (!mounted) return;
+
+      setState(() {
+        _adminUsers = items is List
+            ? items.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+            : [];
+      });
+    } catch (e) {
+      _showWarn('관리자 UID 조회 실패: ${_friendlyError(e)}');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _adminUsersLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _showAdminUsersDialog() async {
+    await _loadAdminUsers();
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('관리자'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 420,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '서버 등록 UID 수: ${_adminUsers.length}명',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _adminUsersLoading ? null : _loadAdminUsers,
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('다시 고침'),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _openAdminDiscussionPage();
+                    },
+                    child: const Text('신고 관리'),
+                  ),
+                ],
+              ),
+
+              const Divider(),
+
+              Expanded(
+                child: _adminUsersLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : (_adminUsers.isEmpty
+                    ? const Center(child: Text('등록된 UID가 없습니다.'))
+                    : ListView.builder(
+                  itemCount: _adminUsers.length,
+                  itemBuilder: (context, i) {
+                    final u = _adminUsers[i];
+
+                    final uid = (u['uid'] ?? '').toString();
+                    final email = (u['email'] ?? '').toString();
+                    final nickname =
+                    (u['nickname'] ?? '').toString();
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'UID: $uid\n'
+                              '닉네임: ${nickname.isEmpty ? "-" : nickname}\n'
+                              '이메일: ${email.isEmpty ? "-" : email}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                )),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openAdminDiscussionPage() {
     Navigator.push(
       context,
@@ -722,7 +848,7 @@ class _DiscussionPageState extends State<DiscussionPage> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   OutlinedButton.icon(
-                    onPressed: _openAdminDiscussionPage,
+                    onPressed: _showAdminUsersDialog,
                     icon: const Icon(Icons.admin_panel_settings, size: 18),
                     label: const Text('관리자'),
                   ),

@@ -42,7 +42,7 @@ class _AppShellState extends State<AppShell> {
   bool _isSidebarOpen = false;
 
   // ✅ 매매일지 / 투자 게임 현재 모드
-  TradeMode _tradeMode = TradeMode.log;
+  TradeMode _tradeMode = TradeMode.game;
 
   final GlobalKey<MainPageState> _mainPageKey = GlobalKey<MainPageState>();
 
@@ -144,7 +144,7 @@ class _AppShellState extends State<AppShell> {
 
     setState(() {
       _tradeMode =
-      (value == 'game') ? TradeMode.game : TradeMode.log; // 기본은 log
+      (value == 'log') ? TradeMode.log : TradeMode.game; // 기본은 log
     });
   }
 
@@ -203,8 +203,15 @@ class _AppShellState extends State<AppShell> {
       if (savedIndex != null && savedIndex >= 0 && savedIndex <= 4) {
         _selectedIndex = savedIndex;
       }
-      _selectedSymbol = savedSymbol;
-      _selectedName = savedName;
+
+      // ✅ 저장된 종목이 없으면 기본값을 비트코인으로 설정
+      if (savedSymbol == null || savedSymbol.trim().isEmpty) {
+        _selectedSymbol = 'BTC-USD.CC';
+        _selectedName = '비트코인';
+      } else {
+        _selectedSymbol = savedSymbol;
+        _selectedName = savedName ?? savedSymbol;
+      }
     });
   }
 

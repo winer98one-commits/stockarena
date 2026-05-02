@@ -616,6 +616,27 @@ class GameServerApi {
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
+  // --------------------------------------------------
+  // ✅ 관리자 UID 목록 조회
+  //    GET /admin/users
+  // --------------------------------------------------
+  static Future<Map<String, dynamic>> fetchAdminUsers() async {
+    final uri = Uri.parse('$_baseUrl/admin/users?limit=500');
+
+    final headers = await _buildAdminHeaders();
+
+    final res = await http.get(
+      uri,
+      headers: headers,
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception('관리자 UID 조회 실패: ${res.statusCode} ${res.body}');
+    }
+
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
 // --------------------------------------------------
 // ✅ 관리자 전용: 사용자 경고 / 차단 / 해제
 //    POST /admin/user/moderate

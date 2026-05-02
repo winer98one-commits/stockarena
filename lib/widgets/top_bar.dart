@@ -47,8 +47,8 @@ class _TopBarState extends State<TopBar> {
   // ⭐ 검정 별을 "잠깐"만 보여주기 위한 상태
   bool _isFavorite = false;
 
-  final GlobalKey _modeTabKey = GlobalKey();
-  Rect? _modeTabRect;
+  final GlobalKey _loginIconKey = GlobalKey();
+  Rect? _loginIconRect;
 
   Timer? _favoriteTimer;
   static const Duration _favoriteHold = Duration(seconds: 1); // ✅ 유지 시간(원하면 3~5로 변경)
@@ -65,7 +65,7 @@ class _TopBarState extends State<TopBar> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _updateModeTabRect();
+      _updateLoginIconRect();
       _showModeGuideIfNeeded();
     });
   }
@@ -82,8 +82,8 @@ class _TopBarState extends State<TopBar> {
   }
 
   Future<void> _showModeGuideOverlay() async {
-    _updateModeTabRect();
-    final rect = _modeTabRect;
+    _updateLoginIconRect();
+    final rect = _loginIconRect;
     if (rect == null) return;
 
     await showGeneralDialog(
@@ -164,30 +164,35 @@ class _TopBarState extends State<TopBar> {
                 top: guideTop,
                 right: 20,
                 child: Material(
-                  color: Colors.white,
+                  color: Colors.orange.shade50, // 연한 강조 배경
                   borderRadius: BorderRadius.circular(16),
                   elevation: 10,
-                  child: Padding(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.orange,
+                        width: 2,
+                      ),
+                    ),
+                    child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Text(
-                          '여기서 모드를 선택하세요',
+                          '로그인 하세요',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF111111),
+                            color: Colors.orange, // 강조 색상
                           ),
                         ),
                         const SizedBox(height: 10),
                         const Text(
-                          '기록: 내가 한 거래를 저장합니다.\n'
-                              '과거 날짜도 입력할 수 있어 매매일지 정리에 사용합니다.\n\n'
-                              '게임: 가상 돈으로 투자 연습을 합니다.\n'
-                              '현재가 기준으로 거래하고 결과는 순위에 반영됩니다.\n\n'
-                              '먼저 기록 또는 게임을 눌러 원하는 모드를 선택해 주세요.',
+                          '로그인 후 기록과 게임 기능을 사용할 수 있습니다.\n\n'
+                              '로그인하면 데이터가 안전하게 저장됩니다.',
                           style: TextStyle(
                             fontSize: 14,
                             height: 1.55,
@@ -197,15 +202,26 @@ class _TopBarState extends State<TopBar> {
                         const SizedBox(height: 14),
                         Align(
                           alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: const Text('확인'),
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                            ),
+                            onPressed: () async {
+                              Navigator.pop(ctx);
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const LoginPage()),
+                              );
+                            },
+                            child: const Text('로그인'),
                           ),
+
                         ),
                       ],
                     ),
                   ),
                 ),
+              ),
               ),
             ],
           ),
@@ -220,8 +236,8 @@ class _TopBarState extends State<TopBar> {
     );
   }
 
-  void _updateModeTabRect() {
-    final ctx = _modeTabKey.currentContext;
+  void _updateLoginIconRect() {
+    final ctx = _loginIconKey.currentContext;
     if (ctx == null) return;
 
     final renderBox = ctx.findRenderObject() as RenderBox?;
@@ -230,11 +246,11 @@ class _TopBarState extends State<TopBar> {
     final offset = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
 
-    _modeTabRect = Rect.fromLTWH(
+    _loginIconRect = Rect.fromLTWH(
       offset.dx - 8,
-      offset.dy - 6,
+      offset.dy - 8,
       size.width + 16,
-      size.height + 12,
+      size.height + 16,
     );
   }
 
@@ -432,6 +448,7 @@ class _TopBarState extends State<TopBar> {
               const SizedBox(width: _gapActionIcons),
 
               SizedBox(
+                key: _loginIconKey,
                 width: 40,
                 height: 40,
                 child: IconButton(
@@ -459,7 +476,6 @@ class _TopBarState extends State<TopBar> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
-                  key: _modeTabKey,
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
                     _buildTab(

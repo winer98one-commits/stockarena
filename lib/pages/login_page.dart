@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:in_app_review/in_app_review.dart';
-import 'package:in_app_review/in_app_review.dart';
+
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'dart:math';
 import 'dart:io';
@@ -24,6 +24,15 @@ class _LoginPageState extends State<LoginPage> {
   bool _loading = false;
   String? _error;
 
+// null = 첫 화면, nickname = 닉네임 로그인, google = 구글 로그인 후 닉네임 설정
+  String? _loginMode;
+
+// ⭐ 앱 내부 닉네임 계정 중복 생성 제한
+  bool _nicknameLoginLocked = false;
+
+// ⭐ 생성된 아이디 표시용
+  String? _createdNicknameId;
+
   final TextEditingController _nicknameController = TextEditingController();
 
   // ✅ 서버 닉네임 저장/중복체크에 사용하는 값
@@ -40,32 +49,46 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
+
     if (_isSupportedPlatform) {
       _user = FirebaseAuth.instance.currentUser;
 
       final current = _user;
       if (current != null) {
-        // ✅ 서버 닉네임 저장/체크에 사용할 값 보관
         _uid = current.uid;
         _email = current.email;
 
-        // ✅ 로컬에 저장된 닉네임이 있으면 우선 사용
         _nicknameController.text =
             current.displayName ?? _defaultNicknameFromEmail(current.email);
-        SharedPreferences.getInstance().then((prefs) {
-          if (!mounted) return;
-          final savedNick = (prefs.getString('nickname') ?? '').trim();
-          if (savedNick.isNotEmpty) {
-            setState(() {
-              _nicknameController.text = savedNick;
-            });
-          }
-        });
 
-        // ⭐ 기존 계정도 서버 계좌 보장
-        _ensureGameAccount(current.uid, current.displayName ?? "사용자",
-            current.email);
+        _ensureGameAccount(
+          current.uid,
+          current.displayName ?? "사용자",
+          current.email,
+        );
       }
+
+      // ⭐ Firebase 로그인 여부와 상관없이 저장된 닉네임 로그인 상태 복구
+      SharedPreferences.getInstance().then((prefs) {
+        if (!mounted) return;
+
+        final savedNick = (prefs.getString('nickname') ?? '').trim();
+        final savedUid = (prefs.getString('uid') ?? '').trim();
+
+        if (savedNick.isNotEmpty) {
+          setState(() {
+            _nicknameController.text = savedNick;
+            _createdNicknameId = savedUid;
+
+            // ⭐ 닉네임이 있으면 로그인 완료 상태로 강제 처리
+            _nicknameLoginLocked = true;
+            _loginMode = "nickname";
+          });
+
+          // ⭐ 기존에 false로 저장된 값 복구
+          prefs.setBool('nickname_login_locked', true);
+        }
+      });
     }
   }
 
@@ -198,19 +221,38 @@ class _LoginPageState extends State<LoginPage> {
 
   // ⭐ 추가: 입력한 닉네임으로 테스트 계정 생성
   Future<void> _createTestAccountWithNickname() async {
-    if (!kDebugMode) return;
+    final prefs = await SharedPreferences.getInstance();
+
+    final locked = prefs.getBool("nickname_login_locked") ?? false;
+    final savedUid = (prefs.getString("uid") ?? "").trim();
+    final savedNick = (prefs.getString("nickname") ?? "").trim();
+
+    if (locked && savedUid.isNotEmpty) {
+      setState(() {
+        _nicknameLoginLocked = true;
+        _createdNicknameId = savedUid;
+        _nicknameController.text = savedNick;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("이미 생성된 닉네임 계정이 있습니다: $savedNick")),
+      );
+      return;
+    }
 
     final raw = _nicknameController.text.trim();
 
     if (raw.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("테스트 닉네임을 입력하세요.")),
+        const SnackBar(content: Text("닉네임을 입력하세요.")),
       );
       return;
     }
 
-    // uid로 쓰기 안전하게 정리 (공백 제거, 특수문자 일부 제거)
-    final safeNick = raw.replaceAll(RegExp(r"\s+"), "_").replaceAll(RegExp(r"[^a-zA-Z0-9가-힣_\-]"), "");
+    final safeNick = raw
+        .replaceAll(RegExp(r"\s+"), "_")
+        .replaceAll(RegExp(r"[^a-zA-Z0-9가-힣_\-]"), "");
+
     if (safeNick.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("닉네임에 사용할 수 없는 문자가 포함되어 있습니다.")),
@@ -219,25 +261,73 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     final uid = "guest_$safeNick";
-    final email = "$safeNick@test.com";
+    final email = "$safeNick@nickname.local";
 
-    final ok = await _ensureGameAccount(uid, safeNick, email);
+    final available =
+    await GameServerApi.checkNickname(nickname: safeNick, uid: uid);
 
-    if (!ok) {
+    if (!available) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("테스트 계정 생성 실패 (서버/저장 확인 필요)")),
+        const SnackBar(content: Text("이미 사용 중인 닉네임입니다.")),
       );
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("테스트 계정 생성 완료: $safeNick")),
+// ⭐ 경고 팝업 추가
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("주의"),
+        content: const Text(
+          "닉네임 로그인은 기기에만 저장됩니다.\n"
+              "앱 삭제 또는 기기 변경 시 데이터는 복구할 수 없습니다.\n\n"
+              "계속 진행하시겠습니까?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("취소"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("확인"),
+          ),
+        ],
+      ),
     );
 
+    if (confirm != true) return;
+
+// ⭐ 기존 코드
+    final ok = await _ensureGameAccount(uid, safeNick, email);
+
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("닉네임 로그인 실패")),
+      );
+      return;
+    }
+
+
+    await prefs.setString("nickname", safeNick);
+    await prefs.setString("email", email);
+    await prefs.setString("uid", uid);
+    await prefs.setString("game_uid", uid);
+    await prefs.setString("log_uid", uid);
+
+// ⭐ 앱 내부 중복 생성 방지
+    await prefs.setBool("nickname_login_locked", true);
+
     setState(() {
-      _user = null; // Firebase 로그인 아님
+      _user = null;
       _nicknameController.text = safeNick;
+      _nicknameLoginLocked = true;
+      _createdNicknameId = uid;
     });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("닉네임 로그인 완료: $safeNick")),
+    );
 
     Navigator.pop(context, true);
   }
@@ -377,6 +467,29 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _checkNicknameOnly() async {
+    final name = _nicknameController.text.trim();
+    final uid = (_uid ?? _user?.uid ?? '').trim();
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("닉네임 입력")),
+      );
+      return;
+    }
+
+    final available =
+    await GameServerApi.checkNickname(nickname: name, uid: uid);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          available ? "사용 가능" : "이미 사용중",
+        ),
+      ),
+    );
+  }
+
 
   // ------------------- 닉네임 저장 -------------------
 
@@ -411,6 +524,20 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       // ✅ 2) 서버에 닉네임 저장
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("저장"),
+          content: const Text("저장하면 10분간 변경 불가"),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("취소")),
+            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("확인")),
+          ],
+        ),
+      );
+
+      if (ok != true) return;
+
       await GameServerApi.setNickname(uid: uid, nickname: name);
 
       // ✅ 3) Firebase displayName도 같이 맞춤(있을 때만)
@@ -525,6 +652,7 @@ class _LoginPageState extends State<LoginPage> {
                   width: 260,
                   child: TextField(
                     controller: _nicknameController,
+                    readOnly: _nicknameLoginLocked,
                     decoration: const InputDecoration(
                       labelText: "닉네임",
                       border: OutlineInputBorder(),
@@ -535,11 +663,23 @@ class _LoginPageState extends State<LoginPage> {
 
                 SizedBox(
                   width: 260,
-                  child: ElevatedButton.icon(
-                    onPressed: _saveNickname,
-                    icon: const Icon(Icons.save),
-                    label: const Text("닉네임 저장"),
-                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _checkNicknameOnly,
+                          child: const Text("검색"),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _saveNickname,
+                          child: const Text("저장"),
+                        ),
+                      ),
+                    ],
+                  )
                 ),
                 const SizedBox(height: 12),
 
@@ -552,28 +692,116 @@ class _LoginPageState extends State<LoginPage> {
                 const Icon(Icons.person_outline,
                     size: 48, color: Colors.teal),
                 const SizedBox(height: 16),
-                const Text(
-                  "로그인하세요.",
+                Text(
+                  _nicknameLoginLocked && _nicknameController.text.trim().isNotEmpty
+                      ? "${_nicknameController.text.trim()} 님"
+                      : "로그인하세요.",
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
 
-                // ⭐ 구글 로그인 버튼
-                SizedBox(
-                  width: 260,
-                  child: ElevatedButton.icon(
-                    onPressed: _loading ? null : _signInWithGoogle,
-                    icon: _loading
-                        ? const CircularProgressIndicator(strokeWidth: 2)
-                        : const Icon(Icons.login),
-                    label:
-                    Text(_loading ? "로그인 중..." : "Google 계정으로 로그인"),
+// ⭐ 닉네임 입력 (추가)
+// ⭐ 닉네임 로그인 버튼: 처음 화면에서만 표시
+                if (_loginMode == null && !_nicknameLoginLocked) ...[
+                  SizedBox(
+                    width: 260,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _loginMode = "nickname";
+                          _nicknameController.clear();
+                        });
+                      },
+                      icon: const Icon(Icons.person),
+                      label: const Text("닉네임 로그인"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                ],
+
+// ⭐ 닉네임 입력 화면: 닉네임 로그인 진행 중일 때만 표시
+                if (_loginMode == "nickname" && !_nicknameLoginLocked) ...[
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      "※ 닉네임 로그인은 기기에만 저장됩니다.\n"
+                          "앱 삭제 또는 기기 변경 시 데이터는 복구할 수 없습니다.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  SizedBox(
+                    width: 260,
+                    child: TextField(
+                      controller: _nicknameController,
+                      decoration: const InputDecoration(
+                        labelText: "닉네임",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  SizedBox(
+                    width: 260,
+                    child: ElevatedButton(
+                      onPressed: _checkNicknameOnly,
+                      child: const Text("닉네임 검색"),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  SizedBox(
+                    width: 260,
+                    child: ElevatedButton(
+                      onPressed: _createTestAccountWithNickname,
+                      child: const Text("저장 / 시작"),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _loginMode = null;
+                        _nicknameController.clear();
+                      });
+                    },
+                    child: const Text("뒤로"),
+                  ),
+
+                  const SizedBox(height: 12),
+                ],
+
+// ⭐ Google 로그인 버튼: Google 로그인 상태가 아니면 표시
+                if (user == null) ...[
+                  SizedBox(
+                    width: 260,
+                    child: ElevatedButton.icon(
+                      onPressed: _loading ? null : _signInWithGoogle,
+                      icon: _loading
+                          ? const CircularProgressIndicator(strokeWidth: 2)
+                          : const Icon(Icons.login),
+                      label: Text(_loading ? "로그인 중..." : "Google 로그인"),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
 
-                // ⭐ Apple 로그인 버튼 - iOS에서만 표시
-                if (Platform.isIOS)
+              // ⭐ Apple 로그인 버튼 - iOS에서만 표시
+                if (!kIsWeb && Platform.isIOS)
                   SizedBox(
                     width: 260,
                     child: ElevatedButton.icon(
@@ -587,10 +815,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
 
-                if (Platform.isIOS)
-                  const SizedBox(height: 16)
-                else
-                  const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
                 if (kDebugMode) ...[
                   // ✅ 테스트 닉네임 입력
@@ -598,6 +823,7 @@ class _LoginPageState extends State<LoginPage> {
                     width: 260,
                     child: TextField(
                       controller: _nicknameController,
+                      readOnly: _nicknameLoginLocked,
                       decoration: const InputDecoration(
                         labelText: "테스트 닉네임",
                         border: OutlineInputBorder(),
